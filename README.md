@@ -26,9 +26,9 @@ Production-ready FastAPI service that accepts multiple customer sales prompts, c
    OPENAI_API_KEY=sk-...
    OPENAI_FINE_TUNED_MODEL=ft:gpt-3.5-turbo:your-model-id
    WORKERS=4
-   OPENAI_TIMEOUT_SECONDS=30
-  OPENAI_TEMPERATURE=0
-  OPENAI_MAX_TOKENS=150
+   OPENAI_TIMEOUT_SECONDS=60
+   OPENAI_TEMPERATURE=0.7
+   OPENAI_MAX_TOKENS=200
    RATE_LIMIT_PER_MINUTE=120
    ```
 
@@ -41,9 +41,9 @@ Production-ready FastAPI service that accepts multiple customer sales prompts, c
 - `OPENAI_API_KEY` — Your OpenAI API key (keep secret)
 - `OPENAI_FINE_TUNED_MODEL` — Your fine-tuned model ID (example: `ft:gpt-3.5-turbo:your-model-id`)
 - `WORKERS` — Number of Uvicorn workers (default `4`)
-- `OPENAI_TIMEOUT_SECONDS` — OpenAI API timeout (default `30`)
-- `OPENAI_TEMPERATURE` — Sampling temperature for predictions, range `0..2` (default `0`)
-- `OPENAI_MAX_TOKENS` — Max completion tokens per prediction, integer `> 0` (default `150`)
+- `OPENAI_TIMEOUT_SECONDS` — OpenAI API timeout (default `60`)
+- `OPENAI_TEMPERATURE` — Sampling temperature for predictions, range `0..2` (default `0.7`)
+- `OPENAI_MAX_TOKENS` — Max completion tokens per prediction, integer `> 0` (default `200`)
 - `RATE_LIMIT_PER_MINUTE` — Request rate limit (default `120`)
 
 ## Run Locally (without Docker)

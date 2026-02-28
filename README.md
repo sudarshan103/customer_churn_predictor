@@ -1,164 +1,122 @@
-# Churn Predictor FastAPI Backend
+# Customer Churn Predictor API
 
-Production-ready FastAPI service that accepts multiple customer sales prompts, calls a fine-tuned OpenAI model asynchronously, and returns structured churn JSON.
+FastAPI service for predicting customer churn risk using a fine-tuned GPT-3.5 Turbo model. Returns structured predictions with churn scores (1-3), reasoning, and recommended actions.
 
-## Architecture
-
-- `app/routes.py`: API routes (`/health`, `/predict-churn`), request-id middleware, and rate limiting middleware.
-- `app/service.py`: Async OpenAI client integration, concurrent batch processing via `asyncio.gather()`, and model output parsing.
-- `app/schemas.py`: Pydantic request/response schemas.
-- `app/config.py`: Environment-driven settings via `python-dotenv`.
-- Nginx reverse proxy (`nginx/nginx.conf`) in front of Gunicorn + Uvicorn workers.
-
-## Environment & Secrets
-
-### Safe Secret Management
-
-**Use `.env` file (Git-ignored):**
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Fill in your actual API keys in `.env`:
-   ```bash
-   OPENAI_API_KEY=sk-...
-   OPENAI_FINE_TUNED_MODEL=ft:gpt-3.5-turbo:your-model-id
-   WORKERS=4
-   OPENAI_TIMEOUT_SECONDS=60
-   OPENAI_TEMPERATURE=0.7
-   OPENAI_MAX_TOKENS=200
-   RATE_LIMIT_PER_MINUTE=120
-   ```
-
-3. **`.env` is Git-ignored** — your keys will never be committed to the repository.
-
-4. **`.env.example` is committed** — it documents the required variables for other developers (without secrets).
-
-### Required Variables
-
-- `OPENAI_API_KEY` — Your OpenAI API key (keep secret)
-- `OPENAI_FINE_TUNED_MODEL` — Your fine-tuned model ID (example: `ft:gpt-3.5-turbo:your-model-id`)
-- `WORKERS` — Number of Uvicorn workers (default `4`)
-- `OPENAI_TIMEOUT_SECONDS` — OpenAI API timeout (default `60`)
-- `OPENAI_TEMPERATURE` — Sampling temperature for predictions, range `0..2` (default `0.7`)
-- `OPENAI_MAX_TOKENS` — Max completion tokens per prediction, integer `> 0` (default `200`)
-- `RATE_LIMIT_PER_MINUTE` — Request rate limit (default `120`)
-
-## Run Locally (without Docker)
+## Quick Start
 
 ```bash
+# 1. Clone and setup environment
+cp .env.example .env
+# Edit .env with your OpenAI API key and fine-tuned model ID
+
+# 2. Install dependencies
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# 3. Run the service
+uvicorn app.main:app --host 0.0.0.0 --port 10003
+```
+
+Service will be available at `http://localhost:10003`
+
+## Configuration
+
+Create a `.env` file with the following variables:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_FINE_TUNED_MODEL=ft:gpt-3.5-turbo:your-model-id
+OPENAI_TIMEOUT_SECONDS=60
+OPENAI_TEMPERATURE=0.7
+OPENAI_MAX_TOKENS=200
+WORKERS=4
+RATE_LIMIT_PER_MINUTE=120
+```
+
+## Deployment
+
+### Local Development
+
+```bash
 uvicorn app.main:app --host 0.0.0.0 --port 10003 --reload
 ```
 
-## Run with Gunicorn + Uvicorn
+### Production with Gunicorn
 
 ```bash
 gunicorn app.main:app \
   -k uvicorn.workers.UvicornWorker \
-  --workers ${WORKERS:-4} \
+  --workers 4 \
   --bind 0.0.0.0:10003
 ```
 
-## Docker Build
-
-```bash
-docker build -t churn-api:latest .
-```
-
-## Docker Compose (App + Nginx)
+### Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-API is available through Nginx at `http://localhost:10003`.
+Access via Nginx at `http://localhost:10003`
 
-## Endpoints
+## API Reference
 
-### Health
+### Health Check
 
-`GET /health`
-
-Response:
+**GET** `/health`
 
 ```json
 {"status": "ok"}
 ```
 
-### Predict Churn
+### Predict Customer Churn
 
-`POST /predict-churn`
+**POST** `/predict-churn`
 
-Request:
-
+**Request:**
 ```json
 {
   "prompts": [
-    "Customer bought 500ml regularly for 6 months...",
-    "Customer bought 250ml irregularly for 2 months..."
+    "Customer bought 500ml regularly for 6 months. Price increased by 8% recently. Last purchase was 18 days ago. Predict churn risk.",
+    "Customer bought 250ml irregularly for 2 months. Price increased by 15% recently. They raised 2 complaint(s) about product defect. Last purchase was 40 days ago. Predict churn risk."
   ]
 }
 ```
 
-Note: The API is batch-first and always processes a `prompts` list. If you send a single string in `prompts`, it is automatically normalized to a one-item list.
-
-Single customer example:
-
-```json
-{
-  "prompts": [
-    "Customer bought 500ml regularly for 6 months. Price increased by 8%. Last purchase was 18 days ago. Predict churn risk."
-  ]
-}
-```
-
-Many customers example:
-
-```json
-{
-  "prompts": [
-    "Customer bought 500ml regularly for 6 months...",
-    "Customer bought 250ml irregularly for 2 months...",
-    "Customer bought 1000ml regularly for 4 months..."
-  ]
-}
-```
-
-Response:
-
+**Response:**
 ```json
 {
   "results": [
     {
+      "churn_score": 2,
+      "reasoning": "Moderate churn risk due to noticeable price increase or minor service issues.",
+      "action": "Offer moderate loyalty credits or targeted discounts to prevent churn."
+    },
+    {
       "churn_score": 3,
-      "reasoning": "High churn risk due to inactivity...",
-      "action": "Immediate outreach from support..."
+      "reasoning": "High churn risk due to inactivity, major complaints, and strong competitor offers.",
+      "action": "Immediate outreach from support with personalized discount or offer."
     }
   ]
 }
 ```
 
-## Example cURL
+**Churn Score:**
+- `1` - Low risk (stable customer)
+- `2` - Moderate risk (requires attention)
+- `3` - High risk (immediate action needed)
 
-```bash
-curl -X POST http://localhost:10003/predict-churn \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompts": [
-      "Customer bought 500ml regularly for 6 months...",
-      "Customer bought 250ml irregularly for 2 months..."
-    ]
-  }'
-```
+## Features
 
-## Notes
+- **Batch Processing**: Process multiple customer profiles concurrently
+- **Rate Limiting**: Built-in rate limiting (120 requests/minute)
+- **Request Tracking**: Request ID middleware for tracing
+- **Structured Output**: Validated responses with churn score, reasoning, and actionable recommendations
+- **Production Ready**: Gunicorn + Uvicorn workers with Nginx reverse proxy support
 
-- Batch requests are processed concurrently with `asyncio.gather()`.
-- Responses are parsed safely into strict typed schema (`churn_score`, `reasoning`, `action`).
-- Structured logging includes request count and model latency.
-- Includes request ID middleware and simple in-memory rate limiting.
+## Architecture
+
+- **Routes** (`app/routes.py`): API endpoints, middleware, rate limiting
+- **Service** (`app/service.py`): OpenAI integration, async batch processing
+- **Schemas** (`app/schemas.py`): Pydantic models for request/response validation
+- **Config** (`app/config.py`): Environment-based configuration
